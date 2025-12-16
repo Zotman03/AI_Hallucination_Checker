@@ -18,7 +18,6 @@ reference_messy_txt/
 reference_clean_txt/
 html_report/
 *.pdf
-*.html
 
 # IDE
 .vscode/

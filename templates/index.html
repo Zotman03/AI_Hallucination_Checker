@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detect AI Hallucination</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            margin-top: 50px;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            font-size: 3rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .subtitle {
+            color: rgba(255,255,255,0.9);
+            text-align: center;
+            font-size: 1.2rem;
+            margin-bottom: 40px;
+        }
+
+        .upload-area {
+            background: white;
+            border-radius: 20px;
+            padding: 60px 40px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+        }
+
+        .upload-area.drag-over {
+            background: #f0f0f0;
+            border: 3px dashed #667eea;
+        }
+
+        .upload-icon {
+            font-size: 80px;
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+
+        .upload-text {
+            font-size: 1.4rem;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .upload-subtext {
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .status.error {
+            background: #fee;
+            color: #c33;
+            border: 1px solid #fcc;
+            display: block;
+        }
+
+        .status.success {
+            background: #efe;
+            color: #3c3;
+            border: 1px solid #cfc;
+            display: block;
+        }
+
+        .status.processing {
+            background: #fef5e7;
+            color: #f39c12;
+            border: 1px solid #f9e79f;
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+            display: none;
+        }
+
+        .spinner.active {
+            display: block;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .report-frame {
+            margin-top: 30px;
+            width: 100%;
+            height: 600px;
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            display: none;
+            background: white;
+        }
+
+        .report-frame.active {
+            display: block;
+        }
+
+        .file-name {
+            margin-top: 20px;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .actions {
+            margin-top: 20px;
+            display: none;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .actions.active {
+            display: flex;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Detect AI Hallucination</h1>
+        <p class="subtitle">Upload a PDF to validate references and detect potential AI-generated errors</p>
+        
+        <div class="upload-area" id="upload-area">
+            <div class="upload-icon">📄</div>
+            <div class="upload-text">Drop your PDF here</div>
+            <div class="upload-subtext">or</div>
+            <button class="btn" id="upload-btn" onclick="document.getElementById('file-input').click()">
+                Choose File
+            </button>
+            <input type="file" id="file-input" accept=".pdf">
+            <div class="file-name" id="file-name"></div>
+        </div>
+
+        <div class="spinner" id="spinner"></div>
+        
+        <div class="status" id="status"></div>
+
+        <div class="actions" id="actions">
+            <button class="btn" id="download-btn" onclick="downloadReport()">Download Report</button>
+        </div>
+
+        <iframe class="report-frame" id="report-frame"></iframe>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('upload-area');
+        const fileInput = document.getElementById('file-input');
+        const uploadBtn = document.getElementById('upload-btn');
+        const status = document.getElementById('status');
+        const spinner = document.getElementById('spinner');
+        const reportFrame = document.getElementById('report-frame');
+        const fileName = document.getElementById('file-name');
+        const actions = document.getElementById('actions');
+        let currentReportFilename = null;
+
+        // Drag and drop handlers
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('drag-over');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('drag-over');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            if (file.type !== 'application/pdf') {
+                showStatus('Please upload a PDF file', 'error');
+                return;
+            }
+
+            fileName.textContent = `Selected: ${file.name}`;
+            uploadFile(file);
+        }
+
+        async function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            uploadBtn.disabled = true;
+            spinner.classList.add('active');
+            showStatus('Processing your PDF... This may take several minutes.', 'processing');
+            reportFrame.classList.remove('active');
+            actions.classList.remove('active');
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    showStatus(data.message, 'success');
+                    currentReportFilename = data.filename;
+                    reportFrame.src = data.report_url;
+                    reportFrame.classList.add('active');
+                    actions.classList.add('active');
+                } else {
+                    showStatus(`Error: ${data.error}${data.details ? '\n' + data.details : ''}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`Network error: ${error.message}`, 'error');
+            } finally {
+                uploadBtn.disabled = false;
+                spinner.classList.remove('active');
+            }
+        }
+
+        function showStatus(message, type) {
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+
+        function downloadReport() {
+            if (currentReportFilename) {
+                window.location.href = `/download/${currentReportFilename}`;
+            }
+        }
+    </script>
+</body>
+</html>
+
